@@ -115,8 +115,9 @@ A major requirement for enterprise document search is traceability. When the age
 
 We use the ADK's `after_model_callback` pattern to intercept the response, extract the chunk URIs, and format them into a user-friendly citation map:
 
-1. **Extraction:** Intercept `llm_response.grounding_metadata.grounding_chunks`.
-2. **State Management:** Map raw GCS URIs to anonymized or simplified citation keys (e.g., `uri_1`, `uri_2`) and store them in the `callback_context.state`.
-3. **Sequential Pipeline:** Pass the response and the state to a secondary `citation_agent` (via `SequentialAgent`) that acts exclusively to reformat the text, replacing inline LLM citations with the mapped `<#href: uri_X>` tags.
+1. **Extraction:** Intercept `llm_response.grounding_metadata.grounding_chunks` from the first agent (`mm_doc_search_agent`).
+2. **State Management:** Map raw GCS URIs to anonymized or simplified citation keys (e.g., `uri_1`, `uri_2`) and store them in the `callback_context.state` under `grounding_metadata_uri_map`.
+3. **Output Formatting Agent:** Pass the response to a secondary agent (`mm_doc_search_agent_output_formatting_agent`) using a `SequentialAgent`. This formatting agent uses a specific instruction (`MM_DOC_SEARCH_AGENT_OUTPUT_FORMATTING_INSTRUCTION`) to rewrite the text so that it includes inline citations in the format `[[uri_X]]`.
+4. **URI Replacement (Regex):** Finally, use a second `after_model_callback` (`process_doc_search_output_formatting_response_to_replace_uri`) on the formatting agent to parse `.content.parts`. It uses regex to replace `[[uri_X]]` with actual Markdown links `[actual_uri]`, referencing the map stored in the context state.
 
-This ensures the user sees an authoritative, clean response while the underlying system tracks exact origin URIs.
+This `SequentialAgent` pipeline ensures the user sees an authoritative, naturally-flowing response with clean, inline `[uri]` citations, while the underlying system handles context retrieval and complex metadata mapping seamlessly.
